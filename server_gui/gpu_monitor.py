@@ -100,6 +100,7 @@ class GpuMonitorBar(QGroupBox):
 
     # ------------------------------------------------------------ 采样线程
     def _worker(self):
+        self._last_err = None
         try:
             import gpu_smi
         except ImportError:
@@ -119,8 +120,10 @@ class GpuMonitorBar(QGroupBox):
                 break
             self._stop.wait(1.0)
         if data is None:
+            detail = self._last_err or "未知原因"
             self._sample_error.emit(
-                "gpu-smi 未查询到 GPU（无独立显卡或驱动异常）")
+                f"GPU 监控不可用：gpu-smi 未查询到 GPU（无独立显卡或驱动"
+                f"异常）\n{detail}")
             return
         self._sample_ready.emit(data)
         while not self._stop.is_set():
@@ -131,12 +134,15 @@ class GpuMonitorBar(QGroupBox):
 
     def _sample(self, gpu_smi):
         """一次采样。返回 (name, ratio, used_mb, total_mb, top)，
-        各字段可为 None；查询失败返回 None。"""
+        各字段可为 None；查询失败返回 None（原因记入 self._last_err）。"""
         try:
             gpus = gpu_smi.gpus()
-        except Exception:
+        except Exception as e:
+            self._last_err = f"{type(e).__name__}: {e}"
             return None
+        self._last_err = None
         if not gpus:
+            self._last_err = "查询成功但返回空列表（未检测到显卡）"
             return None
         gpu = gpus[0]
 

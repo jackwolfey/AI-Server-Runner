@@ -14,11 +14,26 @@
      可再缩小约 30%~50%；vcruntime / Python 运行时已排除以防启动异常
 """
 
+import os
+
+# 程序图标 + gpu-smi 库捆绑的原生查询程序。
+# gpu_smi/bin/gpu-smi.exe 是 wheel 里的数据文件，打包器默认只收集 .py，
+# 缺了它打包后就会报「GPU 监控不可用：未查询到 GPU」，必须手动带上。
+_datas = [("app_icon.ico", ".")]
+try:
+    import gpu_smi
+    _gs_bin = os.path.join(os.path.dirname(gpu_smi.__file__),
+                           "bin", "gpu-smi.exe")
+    if os.path.isfile(_gs_bin):
+        _datas.append((_gs_bin, "gpu_smi/bin"))
+except ImportError:
+    pass  # 构建环境未装 gpu-smi：按原行为打包（运行时会提示未安装）
+
 a = Analysis(
     ["main.py"],
     pathex=[],
     binaries=[],
-    datas=[("app_icon.ico", ".")],  # 窗口图标随包携带（exe 图标由下方 icon= 指定）
+    datas=_datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
