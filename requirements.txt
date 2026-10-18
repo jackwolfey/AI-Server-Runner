@@ -1,0 +1,3 @@
+# 运行时依赖（打包用到的 pyinstaller 见 README「打包为 exe」一节）
+PySide6>=6.5
+gpu-smi

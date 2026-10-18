@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# PyInstaller 产物
+build/
+dist/
+*.manifest
+
+# 运行时生成的本地配置（个人路径，不随仓库分发）
+llama_gui_state.json
+llama_gui_presets.json
+
+# IDE / 编辑器
+.vscode/
+.idea/
+
+# 系统
+Thumbs.db
+.DS_Store
