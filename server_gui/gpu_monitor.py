@@ -11,8 +11,11 @@
 依赖：pip install gpu-smi
 """
 
+import os
 import re
+import subprocess
 import threading
+import types
 
 from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import (QGroupBox, QHBoxLayout, QLabel, QProgressBar,
@@ -54,6 +57,30 @@ def _to_number(v):
         if m:
             return float(m.group(1))
     return None
+
+
+def _patch_gpu_smi_no_window(gpu_smi):
+    """修补 gpu-smi 库在 Windows 下闪现命令行窗口的问题。
+
+    库的 _core 调用捆绑的 gpu-smi.exe 时未加 CREATE_NO_WINDOW：带控制台
+    的环境（源码方式运行）里子进程继承控制台看不出异常，但无控制台的
+    GUI 程序（打包后的 exe / pythonw）每次采样都会闪出一个命令行窗口。
+    此处仅替换库内部对 subprocess 模块的引用、注入该标志，
+    不影响程序其它部分，也不修改第三方库文件。
+    """
+    if os.name != "nt":
+        return
+    core = getattr(gpu_smi, "_core", None)
+    if core is None or getattr(core, "subprocess", None) is None:
+        return
+    orig_run, orig_texp = subprocess.run, subprocess.TimeoutExpired
+
+    def _run(*args, **kwargs):
+        kwargs.setdefault("creationflags", subprocess.CREATE_NO_WINDOW)
+        return orig_run(*args, **kwargs)
+
+    core.subprocess = types.SimpleNamespace(run=_run,
+                                            TimeoutExpired=orig_texp)
 
 
 class GpuMonitorBar(QGroupBox):
@@ -110,6 +137,7 @@ class GpuMonitorBar(QGroupBox):
         except Exception as e:
             self._sample_error.emit(f"加载 gpu-smi 失败：{e}")
             return
+        _patch_gpu_smi_no_window(gpu_smi)
         # 首次采样失败时重试几次：驱动初始化慢等瞬时故障不应永久放弃监控
         data = None
         for _ in range(3):
